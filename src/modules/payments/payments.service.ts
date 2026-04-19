@@ -27,13 +27,7 @@ export class PaymentsService {
       }
 
       const payment = await tx.payment.create({
-        data: {
-          orderId: order.id,
-          method: dto.method,
-          amountCents: dto.amountCents,
-          tenantId,
-          createdById: actorId,
-        },
+        data: {orderId: order.id, method: dto.method, amountCents: dto.amountCents, tenantId, createdById: actorId},
       });
 
       const totalPaid = order.paidAmountCents + dto.amountCents;
