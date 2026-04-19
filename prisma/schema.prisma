@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(WAITER)
+  tenantId     String   @map("tenant_id") @db.Uuid
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Table {
+  id       String         @id @default(uuid()) @db.Uuid
+  tenantId String         @map("tenant_id") @db.Uuid
+  number   Int
+  sessions TableSession[]
+
+  @@unique([tenantId, number])
+  @@map("tables")
+}
+
+model TableSession {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @map("tenant_id") @db.Uuid
+  tableId       String             @map("table_id") @db.Uuid
+  status        TableSessionStatus @default(OPEN)
+  openedAt      DateTime           @default(now()) @map("opened_at")
+  closedAt      DateTime?          @map("closed_at")
+  openedById    String             @map("opened_by_id") @db.Uuid
+  prepaymentAmountCents Int        @default(0) @map("prepayment_amount_cents")
+
+  table  Table   @relation(fields: [tableId], references: [id])
+  orders Order[]
+
+  @@index([tenantId, status])
+  @@map("table_sessions")
+}
+
+model Product {
+  id       String      @id @default(uuid()) @db.Uuid
+  tenantId String      @map("tenant_id") @db.Uuid
+  name     String
+  priceCents Int       @map("price_cents")
+  isActive Boolean     @default(true) @map("is_active")
+
+  orderItems OrderItem[]
+  stock      Stock?
+
+  @@index([tenantId])
+  @@map("products")
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  tableSessionId String      @map("table_session_id") @db.Uuid
+  totalCents     Int         @default(0) @map("total_cents")
+  paidAmountCents Int        @default(0) @map("paid_amount_cents")
+  status         OrderStatus @default(OPEN)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  createdById    String      @map("created_by_id") @db.Uuid
+
+  tableSession TableSession @relation(fields: [tableSessionId], references: [id])
+  items        OrderItem[]
+  payments     Payment[]
+
+  @@index([tenantId])
+  @@index([tableSessionId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  orderId   String  @map("order_id") @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  quantity  Int
+  unitCents Int     @map("unit_cents")
+  notes     String? @db.VarChar(200)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  orderId     String        @map("order_id") @db.Uuid
+  method      PaymentMethod
+  amountCents Int           @map("amount_cents")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  createdById String        @map("created_by_id") @db.Uuid
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model Stock {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  productId String   @unique @map("product_id") @db.Uuid
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("stock")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  WAITER
+  CASHIER
+}
+
+enum TableSessionStatus {
+  OPEN
+  CHECKOUT_REQUESTED
+  CLOSED
+}
+
+enum OrderStatus {
+  OPEN
+  CANCELLED
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+}
