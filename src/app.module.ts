@@ -6,6 +6,7 @@ import { TablesModule } from './modules/tables/tables.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { StockModule } from './modules/stock/stock.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { StockModule } from './modules/stock/stock.module';
     TablesModule,
     OrdersModule,
     PaymentsModule,
+    ProductsModule,
     StockModule,
   ],
 })

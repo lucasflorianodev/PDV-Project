@@ -50,16 +50,21 @@ model TableSession {
 }
 
 model Product {
-  id       String      @id @default(uuid()) @db.Uuid
-  tenantId String      @map("tenant_id") @db.Uuid
-  name     String
-  priceCents Int       @map("price_cents")
-  isActive Boolean     @default(true) @map("is_active")
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(300)
+  priceCents  Int     @map("price_cents")
+  isAvailable Boolean @default(true) @map("is_available")
+  isActive    Boolean @default(true) @map("is_active")  // soft delete
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   orderItems OrderItem[]
   stock      Stock?
 
-  @@index([tenantId])
+  @@index([tenantId, isAvailable])
+  @@index([tenantId, isActive])
   @@map("products")
 }
 

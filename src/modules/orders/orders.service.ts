@@ -1,5 +1,5 @@
 import {
-  Injectable, BadRequestException, ForbiddenException,
+  Injectable, BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -15,16 +15,20 @@ export class OrdersService {
     });
     if (!session) throw new BadRequestException();
 
-    // Busca produtos e calcula total dentro de uma transação
     return this.prisma.$transaction(async (tx) => {
       let totalCents = 0;
       const itemsData = [];
 
       for (const item of dto.items) {
         const product = await tx.product.findFirst({
-          where: { id: item.productId, tenantId, isActive: true },
+          where: {
+            id: item.productId,
+            tenantId,
+            isActive: true,       // Não está deletado (soft delete)
+            isAvailable: true,    // Está disponível para venda
+          },
         });
-        if (!product) throw new BadRequestException(`Produto não encontrado`);
+        if (!product) throw new BadRequestException('Produto indisponível ou não encontrado');
 
         const subtotal = product.priceCents * item.quantity;
         totalCents += subtotal;
@@ -32,7 +36,7 @@ export class OrdersService {
         itemsData.push({
           productId: item.productId,
           quantity: item.quantity,
-          unitCents: product.priceCents,
+          unitCents: product.priceCents, // Snapshot do preço — imutável na ordem
           notes: item.notes,
         });
       }
