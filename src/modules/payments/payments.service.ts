@@ -1,8 +1,10 @@
 import {
-  Injectable, BadRequestException, ConflictException,
+  Injectable,
+  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ProcessPaymentDto } from './dto/process.payment.dto';
+import { ProcessPaymentDto } from './dto/process-payment.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -10,7 +12,28 @@ export class PaymentsService {
 
   async process(dto: ProcessPaymentDto, actorId: string, tenantId: string) {
     return this.prisma.$transaction(async (tx) => {
-      // Valida ownership (anti-IDOR) e busca a ordem
+
+      // --- Idempotência ---
+      // Se a chave já existe, retorna o resultado anterior sem reprocessar
+      const existing = await tx.payment.findFirst({
+        where: { idempotencyKey: dto.idempotencyKey },
+      });
+      if (existing) {
+        /*
+         * DECISÃO DE PROJETO:
+         * Retorna o pagamento já processado em vez de erro.
+         * Protege contra double-submit, retry automático de rede
+         * e tentativas duplicadas do cliente.
+         */
+        return {
+          paymentId: existing.id,
+          status: existing.status,
+          fullyPaid: false, // Não reprocessa — apenas confirma recebimento
+          duplicate: true,
+        };
+      }
+
+      // --- Valida ownership da ordem (anti-IDOR) ---
       const order = await tx.order.findFirst({
         where: { id: dto.orderId, tenantId, status: 'OPEN' },
         include: { tableSession: true },
@@ -22,29 +45,54 @@ export class PaymentsService {
         throw new ConflictException('Conferência não solicitada');
       }
 
-      if (dto.amountCents > order.totalCents - order.paidAmountCents) {
+      const saldoDevedor = order.totalCents - order.paidAmountCents;
+      if (dto.amountCents > saldoDevedor) {
         throw new BadRequestException('Valor excede o saldo devedor');
       }
 
+      // --- Registra pagamento como PENDING primeiro ---
+      // Em integração com gateway: ficaria PENDING até confirmação assíncrona
       const payment = await tx.payment.create({
-        data: {orderId: order.id, method: dto.method, amountCents: dto.amountCents, tenantId, createdById: actorId},
+        data: {
+          orderId:        order.id,
+          method:         dto.method,
+          amountCents:    dto.amountCents,
+          status:         'PENDING',
+          idempotencyKey: dto.idempotencyKey,
+          tenantId,
+          createdById:    actorId,
+        },
       });
 
       const totalPaid = order.paidAmountCents + dto.amountCents;
       const fullyPaid = totalPaid >= order.totalCents;
 
+      // --- Confirma pagamento como PAID ---
+      // Em produção com gateway: esse update viria via webhook, não aqui
+      await tx.payment.update({
+        where: { id: payment.id },
+        data:  { status: 'PAID' },
+      });
+
       if (fullyPaid) {
+        // Quita a ordem
         await tx.order.update({
           where: { id: order.id },
-          data: { status: 'PAID', paidAmountCents: totalPaid },
+          data:  { status: 'PAID', paidAmountCents: totalPaid },
         });
 
+        // Fecha sessão e libera mesa atomicamente
         await tx.tableSession.update({
           where: { id: order.tableSession.id },
-          data: { status: 'CLOSED', closedAt: new Date() },
+          data:  { status: 'CLOSED', closedAt: new Date() },
         });
 
-        // Deduz estoque — constraint no banco impede quantidade negativa
+        await tx.table.update({
+          where: { id: order.tableSession.tableId },
+          data:  { status: 'FREE' },
+        });
+
+        // Deduz estoque
         const items = await tx.orderItem.findMany({
           where: { orderId: order.id },
         });
@@ -60,22 +108,47 @@ export class PaymentsService {
           });
         }
       } else {
+        // Pagamento parcial — atualiza valor pago na ordem
         await tx.order.update({
           where: { id: order.id },
-          data: { paidAmountCents: totalPaid },
+          data:  { paidAmountCents: totalPaid },
         });
       }
 
+      // Log de auditoria — em produção iria para SIEM
       console.log(JSON.stringify({
-        event: 'PAYMENT_PROCESSED',
-        orderId: order.id,
+        event:       'PAYMENT_PROCESSED',
+        orderId:     order.id,
+        paymentId:   payment.id,
         actorId,
         amountCents: dto.amountCents,
+        status:      'PAID',
         fullyPaid,
-        ts: new Date().toISOString(),
+        ts:          new Date().toISOString(),
       }));
 
-      return { paymentId: payment.id, fullyPaid };
+      return { paymentId: payment.id, status: 'PAID', fullyPaid, duplicate: false };
+    });
+  }
+
+  async findByOrder(orderId: string, tenantId: string) {
+    // Valida ownership antes de retornar (anti-IDOR)
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+    });
+    if (!order) throw new BadRequestException();
+
+    return this.prisma.payment.findMany({
+      where: { orderId, tenantId },
+      select: {
+        id:          true,
+        method:      true,
+        amountCents: true,
+        status:      true,
+        createdAt:   true,
+        // Nunca expõe idempotencyKey, gatewayRef ou IDs internos
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 }

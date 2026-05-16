@@ -23,13 +23,22 @@ model User {
 }
 
 model Table {
-  id       String         @id @default(uuid()) @db.Uuid
-  tenantId String         @map("tenant_id") @db.Uuid
+  id       String      @id @default(uuid()) @db.Uuid
+  tenantId String      @map("tenant_id") @db.Uuid
   number   Int
+  status   TableStatus @default(FREE) @map("status")
+
   sessions TableSession[]
 
   @@unique([tenantId, number])
+  @@index([tenantId, status])
   @@map("tables")
+}
+
+enum TableStatus {
+  FREE
+  OCCUPIED
+  RESERVED
 }
 
 model TableSession {
@@ -102,17 +111,28 @@ model OrderItem {
 }
 
 model Payment {
-  id          String        @id @default(uuid()) @db.Uuid
-  tenantId    String        @map("tenant_id") @db.Uuid
-  orderId     String        @map("order_id") @db.Uuid
-  method      PaymentMethod
-  amountCents Int           @map("amount_cents")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  createdById String        @map("created_by_id") @db.Uuid
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  orderId         String        @map("order_id") @db.Uuid
+  method          PaymentMethod
+  amountCents     Int           @map("amount_cents")
+  status          PaymentStatus @default(PENDING) @map("status")
+  idempotencyKey  String        @unique @map("idempotency_key")
+  gatewayRef      String?       @map("gateway_ref") // Referência futura com gateway
+  createdAt       DateTime      @default(now()) @map("created_at")
+  createdById     String        @map("created_by_id") @db.Uuid
 
   order Order @relation(fields: [orderId], references: [id])
 
+  @@index([orderId])
+  @@index([tenantId])
   @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
 }
 
 model Stock {

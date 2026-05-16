@@ -24,19 +24,17 @@ export class OrdersService {
           where: {
             id: item.productId,
             tenantId,
-            isActive: true,       // Não está deletado (soft delete)
-            isAvailable: true,    // Está disponível para venda
+            isActive: true,
+            isAvailable: true,
           },
         });
         if (!product) throw new BadRequestException('Produto indisponível ou não encontrado');
 
-        const subtotal = product.priceCents * item.quantity;
-        totalCents += subtotal;
-
+        totalCents += product.priceCents * item.quantity;
         itemsData.push({
           productId: item.productId,
           quantity: item.quantity,
-          unitCents: product.priceCents, // Snapshot do preço — imutável na ordem
+          unitCents: product.priceCents, // Snapshot de preço
           notes: item.notes,
         });
       }
@@ -65,7 +63,6 @@ export class OrdersService {
       data: { status: 'CANCELLED' },
     });
 
-    // Log de auditoria — em produção iria para SIEM
     console.log(JSON.stringify({
       event: 'ORDER_CANCELLED',
       orderId,
