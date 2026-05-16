@@ -1,160 +1,102 @@
 <p align="center">
   <a href="http://nestjs.com/" target="blank">
-    <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
+    <img src="https://nestjs.com/img/logo-small.svg" width="80" alt="Nest Logo" />
   </a>
 </p>
 
-# PDV System — Back-end
+# ☕ Café Aroma — Sistema de PDV & Gestão de Mesas
 
-Back-end de um sistema de gestão de salão e PDV (Ponto de Venda) desenvolvido como trabalho de conclusão de curso. O projeto foi construído com foco em segurança defensiva, consistência transacional e boas práticas de arquitetura.
+Este repositório contém a solução Full-Stack para o **Café Aroma**, um sistema de Ponto de Venda (PDV) e gerenciamento de mesas e pedidos. O projeto combina um Back-end robusto focado em segurança defensiva com um Front-end Vanilla leve, simulando a operação em tempo real de uma cafeteria.
 
 ---
 
-## Stack
+## 🏗️ Arquitetura do Projeto
 
+O ecossistema é dividido em duas partes principais:
+
+1. **Back-end (API):** Desenvolvido em NestJS, focado em segurança defensiva, consistência transacional, controle de acesso estrito e arquitetura escalável.
+2. **Front-end (Client):** Uma interface Single Page Application (SPA) construída com HTML5, CSS3 e JavaScript puro (sem frameworks ou dependências externas), garantindo alta performance e renderização ágil no ecossistema do salão.
+
+---
+
+## 🛠️ Tech Stack
+
+### Back-end
 - **Runtime:** Node.js v24
 - **Framework:** NestJS 11
 - **Linguagem:** TypeScript
 - **ORM:** Prisma
-- **Banco de dados:** PostgreSQL 16
+- **Banco de Dados:** PostgreSQL 16
 - **Autenticação:** Passport.js + JWT
 
----
-
-## Módulos implementados
-
-- **Auth** — autenticação com JWT, proteção contra brute force e tempo de resposta constante
-- **Users** — gerenciamento de usuários com controle de roles (ADMIN, MANAGER, WAITER, CASHIER)
-- **Products** — catálogo de produtos com controle de disponibilidade e soft delete
-- **Tables** — ciclo de vida de mesas (FREE, OCCUPIED, RESERVED) integrado ao fluxo de pedidos
-- **Orders** — criação e cancelamento de pedidos com snapshot de preço
-- **Payments** — liquidação financeira com idempotência e pagamentos parciais
-- **Stock** — controle de estoque com dedução atômica após pagamento
+### Front-end
+- **Linguagem:** JavaScript (ES6+) Puro / Vanilla JS
+- **Estilização:** CSS3 Moderno
+- **Estrutura:** HTML5 Semântico
 
 ---
 
-## Segurança aplicada
+## 🗂️ Estrutura de Arquivos (Front-end)
 
-- JWT com access token de curta duração (15 min) e refresh token rotativo
-- RBAC em todos os endpoints via `RolesGuard`
-- Proteção contra IDOR: `tenantId` extraído do JWT, nunca do body
-- `ValidationPipe` global com `whitelist` e `forbidNonWhitelisted`
-- UUIDs v4 em todos os identificadores públicos
-- Helmet com headers de segurança
-- CORS restrito à origem configurada
-- Anti-brute-force com lockout progressivo de 15 minutos após 5 tentativas
-- Tempo de resposta constante no login (anti-enumeração)
-- Respostas genéricas sem exposição de stack trace
+cafe-aroma/
+├── index.html   → Estrutura HTML da aplicação
+├── style.css    → Estilos, variáveis de cor e layout visual
+├── data.js      → Mock de dados das mesas e catálogo de produtos
+├── app.js       → Lógica da aplicação (renderização, estado e eventos)
+└── logo.jpeg    → Logotipo do Café Aroma
 
 ---
 
-## Pré-requisitos
+## 🚀 Módulos & Funcionalidades
 
-- Node.js 22+ 
-- Docker (para o PostgreSQL)
-- npm
+### Gestão do Salão e PDV (Front-end)
+- **Mapa de Mesas:** Controle visual de 20 mesas com 3 status dinâmicos:
+  - 🟤 **Ocupada** — Mesa com pedido em andamento.
+  - 🟦 **Livre** — Mesa disponível.
+  - 🟠 **Parcial** — Mesa com consumo iniciado/conferência solicitada.
+- **Filtros Avançados:** Filtragem rápida por status da mesa e por atendente responsável.
+- **Painel de Pedidos:** Listagem detalhada de itens consumidos, cálculo automático de subtotal e total.
+- **Modal de Produtos:** Adição rápida de itens ao catálogo da mesa selecionada.
+- **Modal de Funções:** Ações operacionais como cancelar pedido, transferir mesa, aplicar desconto e fechar conta.
+- **Observações:** Campo de texto dinâmico por pedido para customizações (ex: "Sem açúcar", "Com gelo").
+- **Feedbacks:** Sistema de Toasts para notificações de sucesso ou erro em tempo real.
+
+### Regras de Negócio & Core (Back-end)
+- **Auth:** Autenticação segura com JWT, proteção contra brute force e tempo de resposta constante.
+- **Users:** Gerenciamento de usuários com controle de níveis de acesso (RBAC): ADMIN, MANAGER, WAITER, CASHIER.
+- **Products:** Catálogo de produtos com controle de disponibilidade em estoque e soft delete.
+- **Tables:** Ciclo de vida completo das mesas (FREE, OCCUPIED, RESERVED) integrado nativamente ao fluxo de pedidos.
+- **Orders:** Criação e cancelamento de pedidos blindados com snapshot de preço (evita alteração retroativa de valores).
+- **Payments:** Liquidação financeira com controle de idempotência e suporte a pagamentos parciais.
+- **Stock:** Controle de estoque rígido com dedução atômica diretamente na confirmação do pagamento.
 
 ---
 
-## Configuração do ambiente
+## 🛡️ Segurança Aplicada (Back-end Defensivo)
 
-**1 — Clone o repositório:**
+- **Tokens Securos:** JWT com access token de curta duração (15 min) e refresh token rotativo armazenado de forma segura.
+- **Proteção contra IDOR:** O identificador do lojista (tenantId) é extraído diretamente do JWT verificado, nunca aceito pelo corpo (body) da requisição.
+- **Sanitização de Dados:** ValidationPipe global configurado com whitelist: true e forbidNonWhitelisted: true para bloquear payloads maliciosos.
+- **Ofuscação de Dados:** Uso exclusivo de UUIDs v4 em todos os identificadores públicos expostos na API.
+- **Proteção de Camada:** Implementação do Helmet para injeção de headers de segurança e CORS estritamente restrito à origem configurada.
+- **Mecanismos Anti-Brute-Force:** Sistema de lockout progressivo (bloqueio de 15 minutos após 5 tentativas falhas).
+- **Anti-Enumeração:** Tempo de resposta constante no endpoint de login para mitigar ataques de enumeração de usuários.
+- **Tratamento de Exceções:** Respostas genéricas de erro para o cliente sem qualquer exposição de stack trace.
 
+---
+
+## ⚙️ Pré-requisitos
+
+Para rodar o ecossistema localmente, você precisará de:
+- Node.js 22+
+- Docker (para instanciar o PostgreSQL)
+- Gerenciador de pacotes npm
+
+---
+
+## 🔧 Configuração do Ambiente
+
+1 — Clone o repositório:
 ```bash
-git clone https://github.com/lucasflorianodev/PDV-Project.git
+git clone [https://github.com/lucasflorianodev/PDV-Project.git](https://github.com/lucasflorianodev/PDV-Project.git)
 cd PDV-Project
-```
-
-**2 — Instale as dependências:**
-
-```bash
-npm install
-```
-
-**3 — Configure as variáveis de ambiente:**
-
-```bash
-cp .env.example .env
-```
-
-Edite o `.env` com suas configurações.
-
-**4 — Suba o banco de dados:**
-
-```bash
-docker run --name pdv-postgres \
-  -e POSTGRES_HOST_AUTH_METHOD=trust \
-  -e POSTGRES_DB=pdv_dev \
-  -e POSTGRES_USER=postgres \
-  -p 5432:5432 \
-  -d postgres:16
-```
-
-**5 — Execute as migrations:**
-
-```bash
-npx prisma migrate dev
-```
-
-**6 — Inicie o servidor:**
-
-```bash
-npm run start:dev
-```
-
-A API estará disponível em `http://localhost:3000/api/v1`.
-
----
-
-## Variáveis de ambiente
-
-| Variável | Descrição |
-|---|---|
-| `NODE_ENV` | Ambiente (`development` ou `production`) |
-| `PORT` | Porta do servidor (padrão: 3000) |
-| `DATABASE_URL` | URL de conexão com o PostgreSQL |
-| `JWT_ACCESS_SECRET` | Segredo do access token (mín. 32 caracteres) |
-| `JWT_REFRESH_SECRET` | Segredo do refresh token (mín. 32 caracteres) |
-| `ALLOWED_ORIGIN` | Origem permitida no CORS |
-
----
-
-## Endpoints principais
-
-| Método | Rota | Descrição |
-|---|---|---|
-| POST | `/api/v1/auth/login` | Autenticação |
-| GET | `/api/v1/products` | Listar produtos |
-| POST | `/api/v1/products` | Criar produto |
-| GET | `/api/v1/tables` | Listar mesas |
-| POST | `/api/v1/tables` | Criar mesa |
-| POST | `/api/v1/tables/:id/session` | Abrir sessão na mesa |
-| PATCH | `/api/v1/tables/session/:id/checkout` | Solicitar conferência |
-| POST | `/api/v1/orders` | Criar pedido |
-| PATCH | `/api/v1/orders/:id/cancel` | Cancelar pedido |
-| POST | `/api/v1/payments` | Processar pagamento |
-| GET | `/api/v1/payments/order/:id` | Consultar pagamentos de uma ordem |
-
----
-
-## Scripts disponíveis
-
-```bash
-# Desenvolvimento com hot-reload
-npm run start:dev
-
-# Build de produção
-npm run build
-
-# Produção
-npm run start:prod
-
-# Testes
-npm run test
-```
-
----
-
-## Licença
-
-Projeto acadêmico — uso educacional.
